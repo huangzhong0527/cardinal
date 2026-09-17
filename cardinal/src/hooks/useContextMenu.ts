@@ -12,9 +12,12 @@ type UseContextMenuResult = {
   showHeaderContextMenu: (event: ReactMouseEvent<HTMLElement>) => void;
 };
 
+type DeletePathsHandler = (paths: string[], permanentlyDelete: boolean) => void | Promise<void>;
+
 export function useContextMenu(
   autoFitColumns: (() => void) | null = null,
   onQuickLookRequest?: () => void | Promise<void>,
+  onDeletePaths?: DeletePathsHandler,
 ): UseContextMenuResult {
   const { t } = useTranslation();
   const writeClipboard = useCallback((text: string) => {
@@ -96,29 +99,23 @@ export function useContextMenu(
         });
       }
 
-      const deleteLabel = permanentlyDelete
-        ? t('contextMenu.deleteImmediately', { count: targetPaths.length })
-        : t('contextMenu.moveToTrash', { count: targetPaths.length });
-      items.push({
-        id: 'context_menu.delete',
-        text: deleteLabel,
-        action: () => {
-          if (
-            permanentlyDelete &&
-            !window.confirm(t('contextMenu.confirmPermanentDelete', { count: targetPaths.length }))
-          ) {
-            return;
-          }
-
-          void invoke('delete_paths', { paths: targetPaths, permanentlyDelete }).catch((error) => {
-            console.error('Failed to delete files', error);
-          });
-        },
-      });
+      if (onDeletePaths) {
+        const deleteLabel = permanentlyDelete
+          ? t('contextMenu.deleteImmediately', { count: targetPaths.length })
+          : t('contextMenu.moveToTrash', { count: targetPaths.length });
+        items.push({
+          id: 'context_menu.delete',
+          text: deleteLabel,
+          accelerator: permanentlyDelete ? 'Cmd+Shift+Backspace' : 'Cmd+Backspace',
+          action: () => {
+            void onDeletePaths(targetPaths, permanentlyDelete);
+          },
+        });
+      }
 
       return items;
     },
-    [onQuickLookRequest, t, writeClipboard],
+    [onDeletePaths, onQuickLookRequest, t, writeClipboard],
   );
 
   const buildHeaderMenuItems = useCallback((): MenuItemOptions[] => {

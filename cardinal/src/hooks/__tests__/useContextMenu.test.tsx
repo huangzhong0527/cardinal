@@ -47,15 +47,20 @@ const createShiftEvent = () =>
   }) as React.MouseEvent<HTMLElement>;
 
 describe('useContextMenu', () => {
+  const onDeletePaths = vi.fn();
+
   beforeEach(async () => {
     mocks.menuNewMock.mockClear();
     mocks.popupMock.mockClear();
     mocks.invokeMock.mockClear();
+    onDeletePaths.mockClear();
     await i18n.changeLanguage('en-US');
   });
 
   it('uses plural Copy Paths label and shortcut when multiple paths are selected', async () => {
-    const { result } = renderHook(() => useContextMenu(null), { wrapper });
+    const { result } = renderHook(() => useContextMenu(null, undefined, onDeletePaths), {
+      wrapper,
+    });
 
     result.current.showContextMenu(createEvent(), ['/a', '/b']);
 
@@ -144,7 +149,9 @@ describe('useContextMenu', () => {
   });
 
   it('adds Move to Trash as the final file-menu item', async () => {
-    const { result } = renderHook(() => useContextMenu(null), { wrapper });
+    const { result } = renderHook(() => useContextMenu(null, undefined, onDeletePaths), {
+      wrapper,
+    });
 
     result.current.showContextMenu(createEvent(), ['/a', '/b']);
 
@@ -155,6 +162,7 @@ describe('useContextMenu', () => {
     const items = mocks.menuNewMock.mock.calls[0][0].items as Array<{
       id: string;
       text?: string;
+      accelerator?: string;
       action?: () => void;
     }>;
     const deleteItem = items[items.length - 1];
@@ -162,15 +170,14 @@ describe('useContextMenu', () => {
     expect(deleteItem?.text).toBe('Move to Trash');
     deleteItem?.action?.();
 
-    expect(mocks.invokeMock).toHaveBeenCalledWith('delete_paths', {
-      paths: ['/a', '/b'],
-      permanentlyDelete: false,
-    });
+    expect(deleteItem?.accelerator).toBe('Cmd+Backspace');
+    expect(onDeletePaths).toHaveBeenCalledWith(['/a', '/b'], false);
   });
 
-  it('confirms permanent deletion when the menu is opened with Shift', async () => {
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
-    const { result } = renderHook(() => useContextMenu(null), { wrapper });
+  it('uses permanent deletion when the menu is opened with Shift', async () => {
+    const { result } = renderHook(() => useContextMenu(null, undefined, onDeletePaths), {
+      wrapper,
+    });
 
     result.current.showContextMenu(createShiftEvent(), ['/a']);
 
@@ -181,23 +188,18 @@ describe('useContextMenu', () => {
     const items = mocks.menuNewMock.mock.calls[0][0].items as Array<{
       id: string;
       text?: string;
+      accelerator?: string;
       action?: () => void;
     }>;
     const deleteItem = items[items.length - 1];
     expect(deleteItem?.text).toBe('Delete Immediately…');
     deleteItem?.action?.();
 
-    expect(confirm).toHaveBeenCalledWith(
-      'Permanently delete the selected item(s)? This cannot be undone.',
-    );
-    expect(mocks.invokeMock).toHaveBeenCalledWith('delete_paths', {
-      paths: ['/a'],
-      permanentlyDelete: true,
-    });
+    expect(deleteItem?.accelerator).toBe('Cmd+Shift+Backspace');
+    expect(onDeletePaths).toHaveBeenCalledWith(['/a'], true);
   });
 
-  it('does not delete when permanent deletion is cancelled', async () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(false);
+  it('does not include a file-deletion item without a delete handler', async () => {
     const { result } = renderHook(() => useContextMenu(null), { wrapper });
 
     result.current.showContextMenu(createShiftEvent(), ['/a']);
@@ -210,8 +212,6 @@ describe('useContextMenu', () => {
       id: string;
       action?: () => void;
     }>;
-    items[items.length - 1]?.action?.();
-
-    expect(mocks.invokeMock).not.toHaveBeenCalled();
+    expect(items.find((item) => item.id === 'context_menu.delete')).toBeUndefined();
   });
 });
