@@ -157,7 +157,7 @@ describe('useContextMenu', () => {
       text?: string;
       action?: () => void;
     }>;
-    const deleteItem = items.at(-1);
+    const deleteItem = items[items.length - 1];
     expect(deleteItem?.id).toBe('context_menu.delete');
     expect(deleteItem?.text).toBe('Move to Trash');
     deleteItem?.action?.();
@@ -183,7 +183,7 @@ describe('useContextMenu', () => {
       text?: string;
       action?: () => void;
     }>;
-    const deleteItem = items.at(-1);
+    const deleteItem = items[items.length - 1];
     expect(deleteItem?.text).toBe('Delete Immediately…');
     deleteItem?.action?.();
 
@@ -210,7 +210,7 @@ describe('useContextMenu', () => {
       id: string;
       action?: () => void;
     }>;
-    items.at(-1)?.action?.();
+    items[items.length - 1]?.action?.();
 
     expect(mocks.invokeMock).not.toHaveBeenCalled();
   });
