@@ -140,6 +140,7 @@ pub fn run() -> Result<()> {
             toggle_main_window,
             set_tray_activation_policy,
             copy_files_to_clipboard,
+            delete_paths,
         ])
         .build(tauri::generate_context!())
         .expect("error while running tauri application");

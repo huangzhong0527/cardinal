@@ -25,7 +25,7 @@ export function useContextMenu(
   }, []);
 
   const buildFileMenuItems = useCallback(
-    (targetPathsInput: string[]): MenuItemOptions[] => {
+    (targetPathsInput: string[], permanentlyDelete = false): MenuItemOptions[] => {
       const targetPaths = targetPathsInput.filter(Boolean);
       if (targetPaths.length === 0) {
         return [];
@@ -96,6 +96,26 @@ export function useContextMenu(
         });
       }
 
+      const deleteLabel = permanentlyDelete
+        ? t('contextMenu.deleteImmediately', { count: targetPaths.length })
+        : t('contextMenu.moveToTrash', { count: targetPaths.length });
+      items.push({
+        id: 'context_menu.delete',
+        text: deleteLabel,
+        action: () => {
+          if (
+            permanentlyDelete &&
+            !window.confirm(t('contextMenu.confirmPermanentDelete', { count: targetPaths.length }))
+          ) {
+            return;
+          }
+
+          void invoke('delete_paths', { paths: targetPaths, permanentlyDelete }).catch((error) => {
+            console.error('Failed to delete files', error);
+          });
+        },
+      });
+
       return items;
     },
     [onQuickLookRequest, t, writeClipboard],
@@ -134,7 +154,7 @@ export function useContextMenu(
     (event: ReactMouseEvent<HTMLElement>, targetPaths: string[]) => {
       event.preventDefault();
       event.stopPropagation();
-      void showMenu(buildFileMenuItems(targetPaths));
+      void showMenu(buildFileMenuItems(targetPaths, event.shiftKey));
     },
     [buildFileMenuItems, showMenu],
   );

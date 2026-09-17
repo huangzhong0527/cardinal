@@ -40,6 +40,12 @@ const createEvent = () =>
     'preventDefault' | 'stopPropagation'
   > as React.MouseEvent<HTMLElement>;
 
+const createShiftEvent = () =>
+  ({
+    ...createEvent(),
+    shiftKey: true,
+  }) as React.MouseEvent<HTMLElement>;
+
 describe('useContextMenu', () => {
   beforeEach(async () => {
     mocks.menuNewMock.mockClear();
@@ -135,5 +141,77 @@ describe('useContextMenu', () => {
     copyPaths?.action?.();
 
     expect(writeText).toHaveBeenCalledWith('/a\n/b');
+  });
+
+  it('adds Move to Trash as the final file-menu item', async () => {
+    const { result } = renderHook(() => useContextMenu(null), { wrapper });
+
+    result.current.showContextMenu(createEvent(), ['/a', '/b']);
+
+    await waitFor(() => {
+      expect(mocks.menuNewMock).toHaveBeenCalled();
+    });
+
+    const items = mocks.menuNewMock.mock.calls[0][0].items as Array<{
+      id: string;
+      text?: string;
+      action?: () => void;
+    }>;
+    const deleteItem = items.at(-1);
+    expect(deleteItem?.id).toBe('context_menu.delete');
+    expect(deleteItem?.text).toBe('Move to Trash');
+    deleteItem?.action?.();
+
+    expect(mocks.invokeMock).toHaveBeenCalledWith('delete_paths', {
+      paths: ['/a', '/b'],
+      permanentlyDelete: false,
+    });
+  });
+
+  it('confirms permanent deletion when the menu is opened with Shift', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const { result } = renderHook(() => useContextMenu(null), { wrapper });
+
+    result.current.showContextMenu(createShiftEvent(), ['/a']);
+
+    await waitFor(() => {
+      expect(mocks.menuNewMock).toHaveBeenCalled();
+    });
+
+    const items = mocks.menuNewMock.mock.calls[0][0].items as Array<{
+      id: string;
+      text?: string;
+      action?: () => void;
+    }>;
+    const deleteItem = items.at(-1);
+    expect(deleteItem?.text).toBe('Delete Immediately…');
+    deleteItem?.action?.();
+
+    expect(confirm).toHaveBeenCalledWith(
+      'Permanently delete the selected item(s)? This cannot be undone.',
+    );
+    expect(mocks.invokeMock).toHaveBeenCalledWith('delete_paths', {
+      paths: ['/a'],
+      permanentlyDelete: true,
+    });
+  });
+
+  it('does not delete when permanent deletion is cancelled', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(false);
+    const { result } = renderHook(() => useContextMenu(null), { wrapper });
+
+    result.current.showContextMenu(createShiftEvent(), ['/a']);
+
+    await waitFor(() => {
+      expect(mocks.menuNewMock).toHaveBeenCalled();
+    });
+
+    const items = mocks.menuNewMock.mock.calls[0][0].items as Array<{
+      id: string;
+      action?: () => void;
+    }>;
+    items.at(-1)?.action?.();
+
+    expect(mocks.invokeMock).not.toHaveBeenCalled();
   });
 });
